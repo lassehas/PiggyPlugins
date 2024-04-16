@@ -68,10 +68,12 @@ dependencies {
     implementation project(path: ':SixHourLog')
     implementation project(path: ':SpeedDartMaker')
     implementation project(path: ':SuperglassMake')
+    implementation project(path: ':StrategyExample')
     implementation project(path: ':UpkeepPlugin')
     implementation project(path: ':VardorvisHelper')
     implementation project(path: ':DropParty')
     implementation project(path: ':BetterProfiles')
+    implementation project(path: ':PathingTesting')
     implementation 'io.reactivex.rxjava3:rxjava:3.1.6'
 }
 
@@ -87,7 +89,7 @@ sourceSets {
 }
 
 group = 'com.piggyplugins'
-version = '1.1.0'
+version = '1.1.8'
 sourceCompatibility = "11"
 
 task FatJar(type: Jar) {

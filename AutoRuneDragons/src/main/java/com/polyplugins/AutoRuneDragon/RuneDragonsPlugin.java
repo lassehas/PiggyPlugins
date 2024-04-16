@@ -51,6 +51,7 @@ import net.runelite.api.events.GameTick;
 import net.runelite.api.events.HitsplatApplied;
 import net.runelite.api.events.ItemDespawned;
 import net.runelite.api.events.ItemSpawned;
+import net.runelite.api.vars.AccountType;
 import net.runelite.api.widgets.Widget;
 import net.runelite.api.widgets.WidgetInfo;
 import net.runelite.client.callback.ClientThread;
@@ -626,7 +627,13 @@ public class RuneDragonsPlugin extends Plugin {
     }
 
     protected boolean inPOH() {
+
         boolean status = Arrays.stream(client.getMapRegions()).anyMatch(HOME_REGIONS::contains);
+        String logMessage = "";
+        for (int r : client.getMapRegions()) {
+            logMessage = logMessage + r + ",";
+        }
+        log.info(logMessage);
         if (config.debugMode()) {
             EthanApiPlugin.sendClientMessage("We are in POH - " + status);
         }
