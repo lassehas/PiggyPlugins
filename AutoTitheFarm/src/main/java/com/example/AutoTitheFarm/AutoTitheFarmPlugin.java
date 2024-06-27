@@ -39,14 +39,19 @@ import java.util.regex.Pattern;
 import static com.example.EthanApiPlugin.Collections.query.TileObjectQuery.getObjectComposition;
 import static com.example.EthanApiPlugin.EthanApiPlugin.sendClientMessage;
 import static com.example.EthanApiPlugin.EthanApiPlugin.stopPlugin;
-import static com.example.PacketUtils.PacketReflection.client;
 
 @Slf4j
-@PluginDescriptor(name = "<html><font color=\"#00cbf2\">[L]</font> AutoTitheFarm<html>",
+@PluginDependency(PacketUtilsPlugin.class)
+@PluginDependency(EthanApiPlugin.class)
+@PluginDescriptor(
+        name = "<html><font color=\"#00cbf2\">[L]</font> AutoTitheFarm<html>",
         description = "Will do Tithe Farm for you",
         enabledByDefault = false,
         tags = {""})
 public class AutoTitheFarmPlugin extends Plugin {
+
+    @Inject
+    private Client client;
 
     @Inject
     private OverlayManager overlayManager;
@@ -58,9 +63,10 @@ public class AutoTitheFarmPlugin extends Plugin {
     private ClientThread clientThread;
 
     @Inject
-    private ActionDelayHandler actionDelayHandler;
+    ActionDelayHandler actionDelayHandler;
 
-    AutoTitheFarmOverlay overlay;
+    @Inject
+    private AutoTitheFarmOverlay overlay;
 
     private static final int EMPTY_PATCH = 27383;
 
@@ -111,14 +117,15 @@ public class AutoTitheFarmPlugin extends Plugin {
 
     private final IntegerRandomizer randomCanCount = new IntegerRandomizer(2, 9);
 
+    @Inject
     private EquipmentHandler farmers;
 
+    @Inject
     private EquipmentHandler graceful;
 
     @Override
     public void startUp() {
         log.info("Plugin started");
-        overlay = new AutoTitheFarmOverlay(client, this, config, actionDelayHandler);
         overlayManager.add(overlay);
         initValues();
     }
@@ -138,14 +145,15 @@ public class AutoTitheFarmPlugin extends Plugin {
     private void initValues() {
         setFarmingLevel(getGetPlayerFarmingLevel());
         patchLayout = config.patchLayout().getLayout();
+        totalAmountOfPatches = patchLayout.length;
         defaultStartingPos = isInsideTitheFarm() ? config.patchLayout().getStartingPoint() : null;
         randomCount = randomCanCount.getRandomInteger();
         clientThread.invoke(() -> Inventory.search().withId(ItemID.GRICOLLERS_CAN).first().ifPresent(itm -> InventoryInteraction.useItem(itm, "Check")));
         pluginJustEnabled = true;
         // IntegerRandomizer is only useful when a random integer is looked for more frequently. In this case it isnt, but is still used.
         runEnergyDeviation = new IntegerRandomizer(config.minRunEnergyToIdleUnder(), config.minRunEnergyToIdleUnder() + 10).getRandomInteger();
-        farmers = new EquipmentHandler("Farmer's", config, actionDelayHandler);
-        graceful = new EquipmentHandler("Graceful", config, actionDelayHandler);
+        farmers.setGearName("Farmer's");
+        graceful.setGearName("Graceful");
     }
 
     private void resetValues() {
@@ -212,7 +220,7 @@ public class AutoTitheFarmPlugin extends Plugin {
     }
 
     private Widget getSeed() {
-        return Inventory.search().nameContains("seed").first().orElse(null);
+        return Inventory.search().withName(Plants.getNeededPlant().getPlantName() + " seed").first().orElse(null);
     }
 
     private boolean isGricollersCanFound() {
@@ -223,7 +231,7 @@ public class AutoTitheFarmPlugin extends Plugin {
         if (!isGricollersCanFound()) {
             return false;
         }
-        return randomCount == gricollersChargesUsed || gricollersChargesUsed > randomCount;
+        return gricollersChargesUsed >= randomCount;
     }
 
     public boolean startingNewRun() {
@@ -248,15 +256,32 @@ public class AutoTitheFarmPlugin extends Plugin {
         WorldPoint playerLocation = client.getLocalPlayer().getWorldLocation();
 
         switch (playerOrientation) {
-            case 151: worldPoint = playerLocation.dx(-1).dy(-2); break;
-            case 360: worldPoint = playerLocation.dx(-2).dy(-1); break;
-            case 663: worldPoint = playerLocation.dx(-2).dy(1); break;
-            case 872: worldPoint = playerLocation.dx(-1).dy(2); break;
-            case 1176: worldPoint = playerLocation.dx(1).dy(2); break;
-            case 1385: worldPoint = playerLocation.dx(2).dy(1); break;
-            case 1688: worldPoint = playerLocation.dx(2).dy(-1); break;
-            case 1897: worldPoint = playerLocation.dx(1).dy(-2); break;
-            default: worldPoint = null;
+            case 151:
+                worldPoint = playerLocation.dx(-1).dy(-2);
+                break;
+            case 360:
+                worldPoint = playerLocation.dx(-2).dy(-1);
+                break;
+            case 663:
+                worldPoint = playerLocation.dx(-2).dy(1);
+                break;
+            case 872:
+                worldPoint = playerLocation.dx(-1).dy(2);
+                break;
+            case 1176:
+                worldPoint = playerLocation.dx(1).dy(2);
+                break;
+            case 1385:
+                worldPoint = playerLocation.dx(2).dy(1);
+                break;
+            case 1688:
+                worldPoint = playerLocation.dx(2).dy(-1);
+                break;
+            case 1897:
+                worldPoint = playerLocation.dx(1).dy(-2);
+                break;
+            default:
+                worldPoint = null;
         }
 
         return worldPoint;
@@ -267,7 +292,7 @@ public class AutoTitheFarmPlugin extends Plugin {
     }
 
     private boolean isInsideTitheFarm() {
-        if (client.isInInstancedRegion()) {
+        if (client.getTopLevelWorldView().getScene().isInstance()) {
             return true;
         }
         resetValues();
@@ -285,14 +310,6 @@ public class AutoTitheFarmPlugin extends Plugin {
         log.info(getObjectAction(patch) + "ing");
     }
 
-    private void dropGricollersFertiliser() {
-        if (actionDelayHandler.isWaitForAction()) {
-            return;
-        }
-        Inventory.search().withId(ItemID.GRICOLLERS_FERTILISER).first().ifPresent(item -> InventoryInteraction.useItem(item, "Drop"));
-        actionDelayHandler.setWaitForAction(true);
-    }
-
     private void useItemOnObject(Widget widget, TileObject tileObject) {
         //log.info("Wait for action: " + waitForAction);
         Optional<Widget> optionalWidget = Optional.of(widget);
@@ -307,13 +324,11 @@ public class AutoTitheFarmPlugin extends Plugin {
     }
 
     private void captureEmptyPatches() {
-        totalAmountOfPatches = patchLayout.length;
-
         if (!emptyPatches.isEmpty()) {
             emptyPatches.clear();
         }
         for (int[] point : patchLayout) {
-            WorldPoint worldPoint = WorldPoint.fromScene(client, point[0], point[1], 0);
+            WorldPoint worldPoint = WorldPoint.fromScene(client.getTopLevelWorldView(), point[0], point[1], 0);
             TileObjects.search().withId(EMPTY_PATCH).atLocation(worldPoint).first().ifPresent(emptyPatches::add);
         }
     }
@@ -347,9 +362,15 @@ public class AutoTitheFarmPlugin extends Plugin {
 
         String compareString = null;
         switch (Objects.requireNonNull(Plants.getNeededPlant())) {
-            case BOLOGANO: compareString = "Bologano"; break;
-            case GOLOVANOVA: compareString = "Golovanova"; break;
-            case LOGAVANO: compareString = "Logavano"; break;
+            case BOLOGANO:
+                compareString = "Bologano";
+                break;
+            case GOLOVANOVA:
+                compareString = "Golovanova";
+                break;
+            case LOGAVANO:
+                compareString = "Logavano";
+                break;
         }
 
         // current seed in the inventory should never be null either way
@@ -364,6 +385,7 @@ public class AutoTitheFarmPlugin extends Plugin {
     }
 
     private void handleMinigame() {
+        Optional<Widget> staminaPot = Inventory.search().nameContains("Stamina").first();
         Optional<TileObject> waterBarrel = TileObjects.search().nameContains("Water Barrel").nearestToPlayer();
         int runEnergy = client.getEnergy() / 100;
         final boolean isRunEnabled = client.getVarpValue(173) == 1;
@@ -371,11 +393,7 @@ public class AutoTitheFarmPlugin extends Plugin {
         List<Widget> regularWateringCansToRefill = Inventory.search().idInList(List.of(ItemID.WATERING_CAN, ItemID.WATERING_CAN1,
                 ItemID.WATERING_CAN2, ItemID.WATERING_CAN3, ItemID.WATERING_CAN4, ItemID.WATERING_CAN5, ItemID.WATERING_CAN6,
                 ItemID.WATERING_CAN7)).result();
-
-        if (Inventory.search().withId(ItemID.GRICOLLERS_FERTILISER).first().isPresent()){
-            dropGricollersFertiliser();
-            return;
-        }
+        Optional<Widget> gricollersFertiliser = Inventory.search().withId(ItemID.GRICOLLERS_FERTILISER).first();
 
         setDefaultStartingPosition();
 
@@ -393,9 +411,16 @@ public class AutoTitheFarmPlugin extends Plugin {
         dePopulateList(thirdPhaseObjectsToFocus);
         dePopulateList(fourthPhaseObjectsToFocus);
 
-        // if 10 ticks have passed and no actions have been made within time limit then something went horribly wrong.
-        if (actionDelayHandler.getLastActionTimer() > (startingNewRun() ? 2 : 10) && !EthanApiPlugin.isMoving() && actionDelayHandler.isWaitForAction()) {
+        // if 5 ticks have passed and no any actions have been made within time limit then something went horribly wrong.
+        final boolean isPlayerMoving = EthanApiPlugin.isMoving() || client.getLocalPlayer().getAnimation() != -1;
+        if (actionDelayHandler.getLastActionTimer() > (startingNewRun() ? 2 : 5) && !isPlayerMoving && actionDelayHandler.isWaitForAction()) {
             actionDelayHandler.setWaitForAction(false);
+            log.info("Setting action delay to false");
+        }
+
+        if (gricollersFertiliser.isPresent()) {
+            InventoryInteraction.useItem(gricollersFertiliser.get(), "Drop");
+            return;
         }
 
         if (runEnergy > 0 && !isRunEnabled) {
@@ -418,13 +443,8 @@ public class AutoTitheFarmPlugin extends Plugin {
                 return;
             }
 
-            // in case we've for whatever reason used almost all seeds. We shouldn't be close to the smallest amount either way... >_>
-            if (getSeed().getItemQuantity() < 100) {
-                stopPlugin(this);
-                return;
-            }
-
-            if (fruit.isPresent() && config.stopIfReachedFruitAmountFarmed() && fruit.get().getItemQuantity() >= config.maxFruitToFarm()) {
+            if ((getSeed().getItemQuantity() < 100) ||
+                    (fruit.isPresent() && config.stopIfReachedFruitAmountFarmed() && fruit.get().getItemQuantity() >= config.maxFruitToFarm())) {
                 stopPlugin(this);
                 return;
             }
@@ -462,6 +482,12 @@ public class AutoTitheFarmPlugin extends Plugin {
                 }
                 return;
             }
+
+            if (config.useStaminaPot() && staminaPot.isPresent() && runEnergy < 70 && client.getVarbitValue(Varbits.RUN_SLOWED_DEPLETION_ACTIVE) == 0) {
+                InventoryInteraction.useItem(staminaPot.get(), "Drink");
+                log.info("Drinking stamina potion");
+                return;
+            }
         }
 
         if (!firstPhaseObjectsToFocus.isEmpty()) {
@@ -490,10 +516,6 @@ public class AutoTitheFarmPlugin extends Plugin {
             }
 
             doAction(phase);
-
-            if (phase != lastPhase) {
-                return;
-            }
         }
     }
 
@@ -514,9 +536,15 @@ public class AutoTitheFarmPlugin extends Plugin {
         Optional<Widget> secondChatWindowId = Widgets.search().withTextContains("How many seeds").hiddenState(false).first();
 
         switch (Objects.requireNonNull(Plants.getNeededPlant())) {
-            case GOLOVANOVA: firstChatOptionId = 1; break;
-            case BOLOGANO: firstChatOptionId = 2; break;
-            case LOGAVANO: firstChatOptionId = 3; break;
+            case GOLOVANOVA:
+                firstChatOptionId = 1;
+                break;
+            case BOLOGANO:
+                firstChatOptionId = 2;
+                break;
+            case LOGAVANO:
+                firstChatOptionId = 3;
+                break;
         }
 
         if (getSeed() == null) {
@@ -535,17 +563,26 @@ public class AutoTitheFarmPlugin extends Plugin {
                 TileObjects.search().withId(ObjectID.SEED_TABLE).first().ifPresent(obj -> TileObjectInteraction.interact(obj, "Search"));
                 return;
             }
+            MousePackets.queueClickPacket();
             WidgetPackets.queueResumePause(14352385, firstChatOptionId);
             return;
         }
         openFarmDoor();
     }
 
+    private boolean firstTimeEnteringTitheFarm() {
+        if (Widgets.search().withTextContains("Hey, young sir").first().isPresent()) {
+            sendClientMessage("You're entering the tithe farm for the first time. Please talk to the old man yourself.");
+            return true;
+        }
+        return false;
+    }
+
     @Subscribe
     private void onGameTick(GameTick event) {
         actionDelayHandler.handleLastActionTimer();
 
-        if (!gotRequiredItems()) {
+        if (!gotRequiredItems() || firstTimeEnteringTitheFarm()) {
             stopPlugin(this);
             return;
         }
@@ -654,17 +691,28 @@ public class AutoTitheFarmPlugin extends Plugin {
         int intValue = matcher.find() ? (Integer.parseInt(matcher.group()) / 10) : -1;
 
         switch (intValue) {
-            case 1: return 9;
-            case 2: return 8;
-            case 3: return 7;
-            case 4: return 6;
-            case 5: return 5;
-            case 6: return 4;
-            case 7: return 3;
-            case 8: return 2;
-            case 9: return 1;
-            case 10: return 0;
-            default: return -1;
+            case 1:
+                return 9;
+            case 2:
+                return 8;
+            case 3:
+                return 7;
+            case 4:
+                return 6;
+            case 5:
+                return 5;
+            case 6:
+                return 4;
+            case 7:
+                return 3;
+            case 8:
+                return 2;
+            case 9:
+                return 1;
+            case 10:
+                return 0;
+            default:
+                return -1;
         }
     }
 
@@ -697,7 +745,9 @@ public class AutoTitheFarmPlugin extends Plugin {
         switch (gameState) {
             case CONNECTION_LOST:
             case LOGIN_SCREEN:
-            case LOGIN_SCREEN_AUTHENTICATOR: stopPlugin(this); break;
+            case LOGIN_SCREEN_AUTHENTICATOR:
+                stopPlugin(this);
+                break;
             default: //
         }
     }

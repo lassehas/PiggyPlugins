@@ -14,7 +14,7 @@ allprojects {
         jcenter()
     }
 
-    def runeLiteVersion = '1.10.22'
+    def runeLiteVersion = '1.10.34-SNAPSHOT'
 
     plugins.withType(JavaPlugin) {
         dependencies {
@@ -38,6 +38,7 @@ dependencies {
     implementation project(path: ':AutoTrapper')
     implementation project(path: ':AutoSmith')
     implementation project(path: ':ButterflyCatcher')
+    implementation project(path: ':CluePuzzleSolver')
     implementation project(path: ':DialogueContinuer')
     implementation project(path: ':Firemaking')
     implementation project(path: ':KittenFeeder')
@@ -45,7 +46,6 @@ dependencies {
     implementation project(path: ':AutoRifts')
     implementation project(path: ':AutoTele')
     implementation project(path: ':CalvarionHelper')
-    implementation project(path: ':CannonReloader')
     implementation project(path: ':E3T4G')
     implementation project(path: ':EthansApi')
     implementation project(path: ':ChinBreakHandler')
@@ -74,6 +74,7 @@ dependencies {
     implementation project(path: ':DropParty')
     implementation project(path: ':BetterProfiles')
     implementation project(path: ':PathingTesting')
+    implementation project(path: ':LeftClickBlackJack')
     implementation 'io.reactivex.rxjava3:rxjava:3.1.6'
 }
 
@@ -89,7 +90,7 @@ sourceSets {
 }
 
 group = 'com.piggyplugins'
-version = '1.1.8'
+version = '1.2.7'
 sourceCompatibility = "11"
 
 task FatJar(type: Jar) {
